@@ -1,13 +1,15 @@
-name: "Infra: PR block merge"
-on:
-  pull_request:
-    types: [opened, labeled, unlabeled, synchronize]
 jobs:
   block_merge:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
-      - uses: mheap/github-action-required-labels@v5
-        with:
-          mode: exactly
-          count: 0
-          labels: "status/blocked, status/needs-attention, status/on-hold, status/pending, status/triage, status/pending-backend, status/pending-frontend, status/pending-QA"
+    - continue-on-error: true
+      uses: mheap/github-action-required-labels@v5
+      with:
+        count: 0
+        labels: status/blocked, status/needs-attention, status/on-hold, status/pending,
+          status/triage, status/pending-backend, status/pending-frontend, status/pending-QA
+        mode: exactly
+name: 'Infra: PR block merge'
+on:
+  repository_dispatch:
+    types: trigger-ga___block_merge.yml

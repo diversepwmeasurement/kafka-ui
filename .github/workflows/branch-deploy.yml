@@ -1,105 +1,137 @@
-name: "Infra: Feature Testing: Init env"
-on:
-  workflow_dispatch:
-
-  pull_request:
-    types: ['labeled']
 jobs:
   build:
-    if: ${{ github.event.label.name == 'status/feature_testing' || github.event.label.name == 'status/feature_testing_public' }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-      - name: get branch name
-        id: extract_branch
-        run: |
-          tag='pr${{ github.event.pull_request.number }}'
-          echo "tag=${tag}" >> $GITHUB_OUTPUT
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Set up JDK
-        uses: actions/setup-java@v3
-        with:
-          java-version: '17'
-          distribution: 'zulu'
-          cache: 'maven'
-      - name: Build
-        id: build
-        run: |
-          ./mvnw -B -ntp versions:set -DnewVersion=$GITHUB_SHA
-          ./mvnw -B -V -ntp clean package -Pprod -DskipTests
-          export VERSION=$(./mvnw -q -Dexec.executable=echo -Dexec.args='${project.version}' --non-recursive exec:exec)
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-      - name: Set up Docker Buildx
-        id: buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Cache Docker layers
-        uses: actions/cache@v3
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-
-      - name: Configure AWS credentials for Kafka-UI account
-        uses: aws-actions/configure-aws-credentials@v3
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: eu-central-1
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-      - name: Build and push
-        id: docker_build_and_push
-        uses: docker/build-push-action@v4
-        with:
-          builder: ${{ steps.buildx.outputs.name }}
-          context: kafka-ui-api
-          push: true
-          tags: 297478128798.dkr.ecr.eu-central-1.amazonaws.com/kafka-ui:${{ steps.extract_branch.outputs.tag }}
-          build-args: |
-            JAR_FILE=kafka-ui-api-${{ steps.build.outputs.version }}.jar
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache
+    if: ${{ github.event.label.name == 'status/feature_testing' || github.event.label.name
+      == 'status/feature_testing_public' }}
     outputs:
       tag: ${{ steps.extract_branch.outputs.tag }}
+    runs-on: self-hosted
+    steps:
+    - continue-on-error: true
+      uses: actions/checkout@v3
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
+    - continue-on-error: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      id: extract_branch
+      name: get branch name
+      run: 'tag=''pr${{ github.event.pull_request.number }}''
+
+        echo "tag=${tag}" >> $GITHUB_OUTPUT
+
+        '
+    - continue-on-error: true
+      name: Set up JDK
+      uses: actions/setup-java@v3
+      with:
+        cache: maven
+        distribution: zulu
+        java-version: '17'
+    - continue-on-error: true
+      id: build
+      name: Build
+      run: './mvnw -B -ntp versions:set -DnewVersion=$GITHUB_SHA
+
+        ./mvnw -B -V -ntp clean package -Pprod -DskipTests
+
+        export VERSION=$(./mvnw -q -Dexec.executable=echo -Dexec.args=''${project.version}''
+        --non-recursive exec:exec)
+
+        echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+        '
+    - continue-on-error: true
+      name: Set up QEMU
+      uses: docker/setup-qemu-action@v2
+    - continue-on-error: true
+      id: buildx
+      name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+    - continue-on-error: true
+      name: Cache Docker layers
+      uses: actions/cache@v3
+      with:
+        key: ${{ runner.os }}-buildx-${{ github.sha }}
+        path: /tmp/.buildx-cache
+        restore-keys: '${{ runner.os }}-buildx-
+
+          '
+    - continue-on-error: true
+      name: Configure AWS credentials for Kafka-UI account
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-region: eu-central-1
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    - continue-on-error: true
+      id: login-ecr
+      name: Login to Amazon ECR
+      uses: aws-actions/amazon-ecr-login@v1
+    - continue-on-error: true
+      id: docker_build_and_push
+      name: Build and push
+      uses: docker/build-push-action@v4
+      with:
+        build-args: 'JAR_FILE=kafka-ui-api-${{ steps.build.outputs.version }}.jar
+
+          '
+        builder: ${{ steps.buildx.outputs.name }}
+        cache-from: type=local,src=/tmp/.buildx-cache
+        cache-to: type=local,dest=/tmp/.buildx-cache
+        context: kafka-ui-api
+        push: false
+        tags: 297478128798.dkr.ecr.eu-central-1.amazonaws.com/kafka-ui:${{ steps.extract_branch.outputs.tag
+          }}
   make-branch-env:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
-      - name: clone
-        run: |
-          git clone https://infra-tech:${{ secrets.INFRA_USER_ACCESS_TOKEN }}@github.com/provectus/kafka-ui-infra.git --branch envs
-      - name: create deployment
-        run: |
-          cd kafka-ui-infra/aws-infrastructure4eks/argocd/scripts
-          echo "Branch:${{ needs.build.outputs.tag }}"
-          ./kafka-ui-deployment-from-branch.sh ${{ needs.build.outputs.tag }} ${{ github.event.label.name }} ${{ secrets.FEATURE_TESTING_UI_PASSWORD }}
-          git config --global user.email "infra-tech@provectus.com"
-          git config --global user.name "infra-tech"
-          git add ../kafka-ui-from-branch/
-          git commit -m "added env:${{ needs.build.outputs.deploy }}" && git push || true
+    - continue-on-error: true
+      name: clone
+      run: 'git clone https://infra-tech:${{ secrets.INFRA_USER_ACCESS_TOKEN }}@github.com/provectus/kafka-ui-infra.git
+        --branch envs
 
-      - name: update status check for private deployment
-        if: ${{ github.event.label.name == 'status/feature_testing' }}
-        uses: Sibz/github-status-action@v1.1.6
-        with:
-          authToken: ${{secrets.GITHUB_TOKEN}}
-          context: "Click Details button to open custom deployment page"
-          state: "success"
-          sha: ${{ github.event.pull_request.head.sha  || github.sha }}
-          target_url: "http://${{ needs.build.outputs.tag }}.internal.kafka-ui.provectus.io"
+        '
+    - continue-on-error: true
+      name: create deployment
+      run: 'cd kafka-ui-infra/aws-infrastructure4eks/argocd/scripts
 
-      - name: update status check for public deployment
-        if: ${{ github.event.label.name == 'status/feature_testing_public' }}
-        uses: Sibz/github-status-action@v1.1.6
-        with:
-          authToken: ${{secrets.GITHUB_TOKEN}}
-          context: "Click Details button to open custom deployment page"
-          state: "success"
-          sha: ${{ github.event.pull_request.head.sha  || github.sha }}
-          target_url: "http://${{ needs.build.outputs.tag }}.internal.kafka-ui.provectus.io"
+        echo "Branch:${{ needs.build.outputs.tag }}"
+
+        ./kafka-ui-deployment-from-branch.sh ${{ needs.build.outputs.tag }} ${{ github.event.label.name
+        }} ${{ secrets.FEATURE_TESTING_UI_PASSWORD }}
+
+        git config --global user.email "infra-tech@provectus.com"
+
+        git config --global user.name "infra-tech"
+
+        git add ../kafka-ui-from-branch/
+
+        git commit -m "added env:${{ needs.build.outputs.deploy }}" && git push ||
+        true
+
+        '
+    - continue-on-error: true
+      if: ${{ github.event.label.name == 'status/feature_testing' }}
+      name: update status check for private deployment
+      uses: Sibz/github-status-action@v1.1.6
+      with:
+        authToken: ${{secrets.GITHUB_TOKEN}}
+        context: Click Details button to open custom deployment page
+        sha: ${{ github.event.pull_request.head.sha  || github.sha }}
+        state: success
+        target_url: http://${{ needs.build.outputs.tag }}.internal.kafka-ui.provectus.io
+    - continue-on-error: true
+      if: ${{ github.event.label.name == 'status/feature_testing_public' }}
+      name: update status check for public deployment
+      uses: Sibz/github-status-action@v1.1.6
+      with:
+        authToken: ${{secrets.GITHUB_TOKEN}}
+        context: Click Details button to open custom deployment page
+        sha: ${{ github.event.pull_request.head.sha  || github.sha }}
+        state: success
+        target_url: http://${{ needs.build.outputs.tag }}.internal.kafka-ui.provectus.io
+name: 'Infra: Feature Testing: Init env'
+on:
+  repository_dispatch:
+    types: trigger-ga___branch-deploy.yml

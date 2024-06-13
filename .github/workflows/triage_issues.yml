@@ -1,14 +1,14 @@
-name: "Infra: Triage: Apply triage label for issues"
-on:
-  issues:
-    types:
-      - opened
 jobs:
   triage_issues:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
-      - name: Label issue
-        uses: andymckay/labeler@master
-        with:
-          add-labels: "status/triage"
-          ignore-if-assigned: true
+    - continue-on-error: true
+      name: Label issue
+      uses: andymckay/labeler@master
+      with:
+        add-labels: status/triage
+        ignore-if-assigned: true
+name: 'Infra: Triage: Apply triage label for issues'
+on:
+  repository_dispatch:
+    types: trigger-ga___triage_issues.yml

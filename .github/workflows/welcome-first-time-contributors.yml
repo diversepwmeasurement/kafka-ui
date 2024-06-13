@@ -1,32 +1,22 @@
+jobs:
+  welcome:
+    runs-on: self-hosted
+    steps:
+    - continue-on-error: true
+      uses: actions/first-interaction@v1
+      with:
+        issue-message: "Hello there ${{ github.actor }}! \U0001F44B\n\nThank you and\
+          \ congratulations \U0001F389 for opening your very first issue in this project!\
+          \ \U0001F496\n\nIn case you want to claim this issue, please comment down\
+          \ below! We will try to get back to you as soon as we can. \U0001F440\n"
+        pr-message: "Hello there ${{ github.actor }}! \U0001F44B\n\nThank you and\
+          \ congrats \U0001F389 for opening your first PR on this project! \u2728\
+          \ \U0001F496\n\nWe will try to review it soon!\n"
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
 name: Welcome first time contributors
-
 on:
-  pull_request_target:
-    types:
-      - opened
-  issues:
-    types:
-      - opened
+  repository_dispatch:
+    types: trigger-ga___welcome-first-time-contributors.yml
 permissions:
   issues: write
   pull-requests: write
-jobs:
-  welcome:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/first-interaction@v1
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          issue-message: |
-            Hello there ${{ github.actor }}! 👋
-
-            Thank you and congratulations 🎉 for opening your very first issue in this project! 💖
-
-            In case you want to claim this issue, please comment down below! We will try to get back to you as soon as we can. 👀
-
-          pr-message: |
-            Hello there ${{ github.actor }}! 👋
-
-            Thank you and congrats 🎉 for opening your first PR on this project! ✨ 💖
-
-            We will try to review it soon!

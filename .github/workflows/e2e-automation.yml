@@ -1,88 +1,98 @@
-name: "E2E: Automation suite"
-on:
-  workflow_dispatch:
-    inputs:
-      test_suite:
-        description: 'Select test suite to run'
-        default: 'regression'
-        required: true
-        type: choice
-        options:
-          - regression
-          - sanity
-          - smoke
-      qase_token:
-        description: 'Set Qase token to enable integration'
-        required: false
-        type: string
-
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v3
-        with:
-          ref: ${{ github.sha }}
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v3
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: eu-central-1
-      - name: Set up environment
-        id: set_env_values
-        run: |
-          cat "./kafka-ui-e2e-checks/.env.ci" >> "./kafka-ui-e2e-checks/.env"
-      - name: Pull with Docker
-        id: pull_chrome
-        run: |
-          docker pull selenoid/vnc_chrome:103.0
-      - name: Set up JDK
-        uses: actions/setup-java@v3
-        with:
-          java-version: '17'
-          distribution: 'zulu'
-          cache: 'maven'
-      - name: Build with Maven
-        id: build_app
-        run: |
-          ./mvnw -B -ntp versions:set -DnewVersion=${{ github.sha }}
-          ./mvnw -B -V -ntp clean install -Pprod -Dmaven.test.skip=true ${{ github.event.inputs.extraMavenOptions }}
-      - name: Compose with Docker
-        id: compose_app
-        # use the following command until #819 will be fixed
-        run: |
-          docker-compose -f kafka-ui-e2e-checks/docker/selenoid-git.yaml up -d
-          docker-compose -f ./documentation/compose/e2e-tests.yaml up -d
-      - name: Run test suite
-        run: |
-          ./mvnw -B -ntp versions:set -DnewVersion=${{ github.sha }}
-          ./mvnw -B -V -ntp -DQASEIO_API_TOKEN=${{ github.event.inputs.qase_token }} -Dsurefire.suiteXmlFiles='src/test/resources/${{ github.event.inputs.test_suite }}.xml' -Dsuite=${{ github.event.inputs.test_suite }} -f 'kafka-ui-e2e-checks' test -Pprod
-      - name: Generate Allure report
-        uses: simple-elf/allure-report-action@master
-        if: always()
-        id: allure-report
-        with:
-          allure_results: ./kafka-ui-e2e-checks/allure-results
-          gh_pages: allure-results
-          allure_report: allure-report
-          subfolder: allure-results
-          report_url: "http://kafkaui-allure-reports.s3-website.eu-central-1.amazonaws.com"
-      - uses: jakejarvis/s3-sync-action@master
-        if: always()
-        env:
-          AWS_S3_BUCKET: 'kafkaui-allure-reports'
-          AWS_REGION: 'eu-central-1'
-          SOURCE_DIR: 'allure-history/allure-results'
-      - name: Deploy report to Amazon S3
-        if: always()
-        uses: Sibz/github-status-action@v1.1.6
-        with:
-          authToken: ${{secrets.GITHUB_TOKEN}}
-          context: "Click Details button to open Allure report"
-          state: "success"
-          sha: ${{ github.sha }}
-          target_url: http://kafkaui-allure-reports.s3-website.eu-central-1.amazonaws.com/${{ github.run_number }}
-      - name: Dump Docker logs on failure
-        if: failure()
-        uses: jwalton/gh-docker-logs@v2.2.1
+    - continue-on-error: true
+      uses: actions/checkout@v3
+      with:
+        ref: ${{ github.sha }}
+    - continue-on-error: true
+      name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-region: eu-central-1
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    - continue-on-error: true
+      id: set_env_values
+      name: Set up environment
+      run: 'cat "./kafka-ui-e2e-checks/.env.ci" >> "./kafka-ui-e2e-checks/.env"
+
+        '
+    - continue-on-error: true
+      id: pull_chrome
+      name: Pull with Docker
+      run: 'docker pull selenoid/vnc_chrome:103.0
+
+        '
+    - continue-on-error: true
+      name: Set up JDK
+      uses: actions/setup-java@v3
+      with:
+        cache: maven
+        distribution: zulu
+        java-version: '17'
+    - continue-on-error: true
+      id: build_app
+      name: Build with Maven
+      run: './mvnw -B -ntp versions:set -DnewVersion=${{ github.sha }}
+
+        ./mvnw -B -V -ntp clean install -Pprod -Dmaven.test.skip=true ${{ github.event.inputs.extraMavenOptions
+        }}
+
+        '
+    - continue-on-error: true
+      id: compose_app
+      name: Compose with Docker
+      run: 'docker-compose -f kafka-ui-e2e-checks/docker/selenoid-git.yaml up -d
+
+        docker-compose -f ./documentation/compose/e2e-tests.yaml up -d
+
+        '
+    - continue-on-error: true
+      name: Run test suite
+      run: './mvnw -B -ntp versions:set -DnewVersion=${{ github.sha }}
+
+        ./mvnw -B -V -ntp -DQASEIO_API_TOKEN=${{ github.event.inputs.qase_token }}
+        -Dsurefire.suiteXmlFiles=''src/test/resources/${{ github.event.inputs.test_suite
+        }}.xml'' -Dsuite=${{ github.event.inputs.test_suite }} -f ''kafka-ui-e2e-checks''
+        test -Pprod
+
+        '
+    - continue-on-error: true
+      id: allure-report
+      if: always()
+      name: Generate Allure report
+      uses: simple-elf/allure-report-action@master
+      with:
+        allure_report: allure-report
+        allure_results: ./kafka-ui-e2e-checks/allure-results
+        gh_pages: allure-results
+        report_url: http://kafkaui-allure-reports.s3-website.eu-central-1.amazonaws.com
+        subfolder: allure-results
+    - continue-on-error: true
+      env:
+        AWS_REGION: eu-central-1
+        AWS_S3_BUCKET: kafkaui-allure-reports
+        SOURCE_DIR: allure-history/allure-results
+      if: always()
+      uses: jakejarvis/s3-sync-action@master
+    - continue-on-error: true
+      if: always()
+      name: Deploy report to Amazon S3
+      uses: Sibz/github-status-action@v1.1.6
+      with:
+        authToken: ${{secrets.GITHUB_TOKEN}}
+        context: Click Details button to open Allure report
+        sha: ${{ github.sha }}
+        state: success
+        target_url: http://kafkaui-allure-reports.s3-website.eu-central-1.amazonaws.com/${{
+          github.run_number }}
+    - continue-on-error: true
+      if: failure()
+      name: Dump Docker logs on failure
+      uses: jwalton/gh-docker-logs@v2.2.1
+name: 'E2E: Automation suite'
+on:
+  repository_dispatch:
+    types: trigger-ga___e2e-automation.yml

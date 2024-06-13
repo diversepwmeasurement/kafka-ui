@@ -1,61 +1,70 @@
-name: "Infra: Terraform deploy"
-on:
-  workflow_dispatch:
-    inputs:
-      applyTerraform:
-        description: 'Do you want to apply the infra-repo terraform? Possible values [plan/apply].'
-        required: true
-        default: 'plan'
-      KafkaUIInfraBranch:
-        description: 'Branch name of Kafka-UI-Infra repo, tf will be executed from this branch'
-        required: true
-        default: 'master'
-
 jobs:
   terraform:
     name: Terraform
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
-      - name: Clone infra repo
-        run: |
-          echo "Cloning repo..."
-          git clone https://kafka-ui-infra:${{ secrets.KAFKA_UI_INFRA_TOKEN }}@gitlab.provectus.com/provectus-internals/kafka-ui-infra.git --branch ${{ github.event.inputs.KafkaUIInfraBranch }}
-          echo "Cd to deployment..."
-          cd kafka-ui-infra/aws-infrastructure4eks/deployment
-          echo "TF_DIR=$(pwd)" >> $GITHUB_ENV
-          echo "Terraform will be triggered in this dir $TF_DIR"
+    - continue-on-error: true
+      name: Clone infra repo
+      run: 'echo "Cloning repo..."
 
-      - name: Configure AWS credentials for Kafka-UI account
-        uses: aws-actions/configure-aws-credentials@v3
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: eu-central-1
+        git clone https://kafka-ui-infra:${{ secrets.KAFKA_UI_INFRA_TOKEN }}@gitlab.provectus.com/provectus-internals/kafka-ui-infra.git
+        --branch ${{ github.event.inputs.KafkaUIInfraBranch }}
 
-      - name: Terraform Install
-        uses: hashicorp/setup-terraform@v2
+        echo "Cd to deployment..."
 
-      - name: Terraform init
-        id: init
-        run: cd $TF_DIR && terraform init --backend-config="../envs/pro/terraform-backend.tfvars"
+        cd kafka-ui-infra/aws-infrastructure4eks/deployment
 
-      - name: Terraform validate
-        id: validate
-        run: cd $TF_DIR && terraform validate -no-color
+        echo "TF_DIR=$(pwd)" >> $GITHUB_ENV
 
-      - name: Terraform plan
-        id: plan
-        run: |
-          cd $TF_DIR
-          export TF_VAR_github_connector_access_token=${{ secrets.SOURCE_CONNECTOR_GITHUB_TOKEN }}
-          export TF_VAR_repo_secret=${{ secrets.KAFKA_UI_INFRA_TOKEN }}
-          terraform plan --var-file="../envs/pro/eks.tfvars"
+        echo "Terraform will be triggered in this dir $TF_DIR"
 
-      - name: Terraform apply
-        id: apply
-        if: ${{ github.event.inputs.applyTerraform == 'apply' }}
-        run: |
-          cd $TF_DIR
-          export TF_VAR_github_connector_access_token=${{ secrets.SOURCE_CONNECTOR_GITHUB_TOKEN }}
-          export TF_VAR_repo_secret=${{ secrets.KAFKA_UI_INFRA_TOKEN }}
-          terraform apply --var-file="../envs/pro/eks.tfvars" -auto-approve
+        '
+    - continue-on-error: true
+      name: Configure AWS credentials for Kafka-UI account
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-region: eu-central-1
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    - continue-on-error: true
+      name: Terraform Install
+      uses: hashicorp/setup-terraform@v2
+    - continue-on-error: true
+      id: init
+      name: Terraform init
+      run: cd $TF_DIR && terraform init --backend-config="../envs/pro/terraform-backend.tfvars"
+    - continue-on-error: true
+      id: validate
+      name: Terraform validate
+      run: cd $TF_DIR && terraform validate -no-color
+    - continue-on-error: true
+      id: plan
+      name: Terraform plan
+      run: 'cd $TF_DIR
+
+        export TF_VAR_github_connector_access_token=${{ secrets.SOURCE_CONNECTOR_GITHUB_TOKEN
+        }}
+
+        export TF_VAR_repo_secret=${{ secrets.KAFKA_UI_INFRA_TOKEN }}
+
+        terraform plan --var-file="../envs/pro/eks.tfvars"
+
+        '
+    - continue-on-error: true
+      id: apply
+      if: ${{ github.event.inputs.applyTerraform == 'apply' }}
+      name: Terraform apply
+      run: 'cd $TF_DIR
+
+        export TF_VAR_github_connector_access_token=${{ secrets.SOURCE_CONNECTOR_GITHUB_TOKEN
+        }}
+
+        export TF_VAR_repo_secret=${{ secrets.KAFKA_UI_INFRA_TOKEN }}
+
+        terraform apply --var-file="../envs/pro/eks.tfvars" -auto-approve
+
+        '
+name: 'Infra: Terraform deploy'
+on:
+  repository_dispatch:
+    types: trigger-ga___terraform-deploy.yml

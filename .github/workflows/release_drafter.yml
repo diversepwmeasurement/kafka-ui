@@ -1,34 +1,22 @@
-name: "Infra: Release Drafter run"
-
-on:
-  push:
-    branches:
-      - master
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Release version'
-        required: false
-      branch:
-        description: 'Target branch'
-        required: false
-        default: 'master'
-
-permissions:
-  contents: read
-
 jobs:
   update_release_draft:
-    runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: write
+    runs-on: self-hosted
     steps:
-      - uses: release-drafter/release-drafter@v5
-        with:
-          config-name: release_drafter.yaml
-          disable-autolabeler: true
-          version: ${{ github.event.inputs.version }}
-          commitish: ${{ github.event.inputs.branch }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - continue-on-error: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: release-drafter/release-drafter@v5
+      with:
+        commitish: ${{ github.event.inputs.branch }}
+        config-name: release_drafter.yaml
+        disable-autolabeler: true
+        version: ${{ github.event.inputs.version }}
+name: 'Infra: Release Drafter run'
+on:
+  repository_dispatch:
+    types: trigger-ga___release_drafter.yml
+permissions:
+  contents: read

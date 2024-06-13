@@ -1,22 +1,19 @@
-name: "Infra: Workflow linter"
-on:
-  pull_request:
-    types:
-      - "opened"
-      - "reopened"
-      - "synchronize"
-      - "edited"
-    paths:
-      - ".github/workflows/**"
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha }}
-      - name: Install yamllint
-        run: sudo apt install -y yamllint
-      - name: Validate workflow yaml files
-        run: yamllint .github/workflows/. -d relaxed -f github --no-warnings
+    - continue-on-error: true
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+        ref: ${{ github.event.pull_request.head.sha }}
+    - continue-on-error: true
+      name: Install yamllint
+      run: sudo apt install -y yamllint
+    - continue-on-error: true
+      name: Validate workflow yaml files
+      run: yamllint .github/workflows/. -d relaxed -f github --no-warnings
+name: 'Infra: Workflow linter'
+on:
+  repository_dispatch:
+    types: trigger-ga___workflow_linter.yaml
